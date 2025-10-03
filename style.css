@@ -1,0 +1,140 @@
+body {
+		font-family: Arial, sans-serif;
+		background: #e3f6f2;
+		margin: 0;
+		padding: 0;
+}
+
+.container {
+		max-width: 600px;
+		margin: 0 auto;
+		padding: 12px;
+		background: #fff;
+		border-radius: 12px;
+		box-shadow: 0 2px 16px #0002;
+}
+
+h1 {
+		font-size: 2em;
+		text-align: center;
+		margin: 16px 0 8px 0;
+		color: #1976d2;
+}
+
+section {
+	margin-bottom: 18px;
+}
+
+form#formBusca {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+input[type="text"] {
+	font-size: 1.2em;
+	padding: 10px;
+	border-radius: 6px;
+	border: 1px solid #ccc;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+button {
+	font-size: 1.1em;
+	padding: 12px;
+	border-radius: 6px;
+	border: none;
+	background: #1976d2;
+	color: #fff;
+	cursor: pointer;
+	margin-top: 6px;
+}
+button:disabled {
+	background: #aaa;
+	cursor: not-allowed;
+}
+
+#dadosCtrc {
+	font-size: 1.1em;
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px #0001;
+	padding: 12px;
+	margin-bottom: 10px;
+}
+
+#resultado {
+	overflow-x: auto;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+	font-size: 1.05em;
+}
+th, td {
+	padding: 10px 6px;
+	text-align: left;
+}
+th {
+		background: #1976d2;
+		color: #fff;
+		font-size: 1.1em;
+}
+tr {
+	border-bottom: 1px solid #eee;
+}
+tr.finalizado {
+		background: #388e3c22;
+}
+tr.parcial {
+		background: #ffd60022;
+}
+tr.pendente {
+	background: #d32f2f22;
+}
+.status-cell {
+	font-weight: bold;
+	border-radius: 4px;
+	padding: 4px 8px;
+}
+.status-finalizado {
+		color: #fff;
+		background: #388e3c;
+}
+.status-parcial {
+		color: #fff;
+		background: #ffd600;
+}
+.status-pendente {
+	color: #fff;
+	background: #d32f2f;
+}
+
+#btnFinalizarPicking {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: 100%;
+	max-width: 600px;
+	margin: 0 auto;
+	z-index: 100;
+	font-size: 1.3em;
+	padding: 18px;
+	border-radius: 0 0 12px 12px;
+}
+body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+h1 { color: #333; }
+section { margin-bottom: 20px; background: #fff; padding: 10px; border: 1px solid #ccc; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+th { background-color: #eee; }
+tr { transition: background 0.2s; }
+tr:hover { background: #e0e0e0; }
+button { padding: 5px 10px; margin: 2px; cursor: pointer; }
+input[type=text] { padding: 5px; width: 200px; margin-right: 10px; }
+#feedback { margin: 10px 0; padding: 10px; border-radius: 4px; font-weight: bold; }

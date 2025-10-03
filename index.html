@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Picking Interface</title>
+  <link rel="icon" type="image/x-icon" href="binho.ico">
+  <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+      body {
+        margin: 0;
+        background: #fff;
+        overflow-x: auto;
+      }
+    </style>
+</head>
+<body>
+
+  <div class="container">
+    <div id="logo-topo" style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+      <img src="binho-logo.png" alt="Binho Transportes" style="height:56px;margin-right:12px;">
+    </div>
+    <h1 style="color:#222;">Separação de Pedidos</h1>
+
+    <!-- Tela de lista de CTRCs -->
+    <section id="telaCtrcList">
+      <h2 style="font-size:1.2em;color:#1976d2;">Selecione o CTRC para Separação</h2>
+      <ul id="listaCtrcs"></ul>
+    </section>
+
+    <!-- Tela de separação -->
+    <section id="telaSeparacao" style="display:none;">
+      <button id="btnVoltar" style="margin-bottom:12px;font-size:1.1em;background:#1976d2;color:#fff;">&larr; Voltar</button>
+      <h2 style="font-size:1.2em;color:#388e3c;">Dados do CTRC Selecionado</h2>
+      <div id="dadosCtrc"></div>
+      <h2 style="font-size:1.2em;color:#d32f2f;">Itens do Picking</h2>
+      <div id="resultado"></div>
+    </section>
+  </div>
+
+  <!-- Cache-bust added to force clients to reload updated script -->
+  <script src="main.js?v=20250918-1"></script>
+</body>
+</html>
