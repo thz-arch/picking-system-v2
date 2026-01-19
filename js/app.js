@@ -1,22 +1,7 @@
 /**
  * Picking Interface - Binho Transportes
- * Main logic for CTRC selection, item separation and barcode scanning.
+ * UI and State management.
  */
-
-// 1. Configuration & Constants
-const CONFIG = {
-  API_URL: 'https://tritton.dev.br/webhook/picking-process',
-  SCAN_TIMEOUT: 60,
-  STORAGE_KEYS: {
-    PROGRESS: 'picking_progress',
-    WAS_SEPARACAO: 'picking_was_separacao',
-    LOGS: 'picking_logs',
-    OFFLINE_QUEUE: 'picking_offline_queue'
-  },
-  SOUNDS: {
-    ALERT: 'mixkit-short-electric-fence-buzz-2966.wav'
-  }
-};
 
 // 2. Global State
 let state = {
@@ -37,66 +22,6 @@ function updateConnectionStatus() {
     statusEl.title = 'Offline';
     showToast('Você está offline. O progresso será salvo localmente.', 'error');
   }
-}
-
-function showLoading() {
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) overlay.style.display = 'flex';
-}
-
-function hideLoading() {
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) overlay.style.display = 'none';
-}
-
-function showToast(message, type = 'success') {
-  const toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.position = 'fixed';
-  toast.style.top = '20px';
-  toast.style.left = '50%';
-  toast.style.transform = 'translateX(-50%)';
-
-  let bg = '#388e3c'; // success green
-  if (type === 'error') bg = '#d32f2f'; // error red
-  if (type === 'warning') bg = '#f57c00'; // warning orange
-
-  toast.style.background = bg;
-  toast.style.color = '#fff';
-  toast.style.padding = '10px 24px';
-  toast.style.borderRadius = '8px';
-  toast.style.zIndex = '10000';
-  toast.style.fontSize = '1.1em';
-  toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-  document.body.appendChild(toast);
-
-  if (type === 'error' || type === 'warning') {
-    tocarAlerta();
-  }
-
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.5s ease';
-    setTimeout(() => toast.remove(), 500);
-  }, 2000);
-}
-
-function tocarAlerta() {
-  const alertAudio = document.getElementById('alertSound');
-  if (alertAudio) {
-    alertAudio.currentTime = 0;
-    alertAudio.play().catch(e => console.warn('Audio play blocked:', e));
-  }
-}
-
-function ensureBipInputFocus(delay = 10) {
-  setTimeout(() => {
-    const bipInput = document.getElementById('inputBipagemGlobal');
-    const telaSeparacao = document.getElementById('telaSeparacao');
-    if (bipInput && telaSeparacao && telaSeparacao.style.display !== 'none') {
-      bipInput.focus();
-    }
-  }, delay);
 }
 
 // 4. Persistence Logic
@@ -133,12 +58,10 @@ function loadProgress() {
 
 // 5. Data Normalization
 function normalizeCtrcData(data) {
-  // If it's a list with one CTRC object, unwrap it
   if (Array.isArray(data) && data.length > 0 && data[0].ctrc) {
     data = data[0];
   }
-  
-  // If it's a raw array of items, wrap it
+
   if (Array.isArray(data) && data.length > 0 && !data[0].ctrc) {
     return {
       ctrc: 'DESCONHECIDO',
@@ -159,7 +82,7 @@ function normalizeCtrcData(data) {
       totais: data.totais || calculateTotals(data.itens || [])
     };
   }
-  
+
   return null;
 }
 
@@ -187,82 +110,6 @@ function calculateTotals(itens) {
   };
 }
 
-// 6. API Calls
-async function apiCall(acao, params = {}) {
-  // If offline and it's not a background sync call, we might want to queue or warn
-  if (!navigator.onLine && acao === 'dar_baixa') {
-    queueOfflineAction(acao, params);
-    showToast('Offline: Ação salva para sincronização posterior.', 'success');
-    return { status: 'queued' };
-  }
-
-  showLoading();
-  try {
-    const response = await fetch(CONFIG.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ acao, ...params })
-    });
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-    return await response.json();
-  } catch (error) {
-    console.error(`[API ERROR] ${acao}:`, error);
-
-    if (acao === 'dar_baixa' && (!navigator.onLine || error.message.includes('Failed to fetch'))) {
-      queueOfflineAction(acao, params);
-      showToast('Erro de conexão: Ação salva para sincronização.', 'success');
-      return { status: 'queued' };
-    }
-
-    showToast(`Erro na comunicação com o servidor: ${error.message}`, 'error');
-    return null;
-  } finally {
-    hideLoading();
-  }
-}
-
-function queueOfflineAction(acao, params) {
-  try {
-    const queue = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE) || '[]');
-    queue.push({ acao, params, timestamp: new Date().toISOString() });
-    localStorage.setItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
-    console.log('[OFFLINE] Action queued:', acao);
-  } catch (e) {
-    console.error('[OFFLINE] Failed to queue action:', e);
-  }
-}
-
-async function processOfflineQueue() {
-  if (!navigator.onLine) return;
-
-  const queue = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE) || '[]');
-  if (queue.length === 0) return;
-
-  console.log(`[SYNC] Processing ${queue.length} offline actions...`);
-  showToast('Sincronizando dados pendentes...');
-
-  const remainingQueue = [];
-  for (const item of queue) {
-    try {
-      const result = await fetch(CONFIG.API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: item.acao, ...item.params })
-      });
-      if (!result.ok) throw new Error('Sync failed');
-      console.log('[SYNC] Action synced successfully:', item.acao);
-    } catch (e) {
-      console.error('[SYNC] Failed to sync item, keeping in queue:', e);
-      remainingQueue.push(item);
-    }
-  }
-
-  localStorage.setItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(remainingQueue));
-  if (remainingQueue.length === 0) {
-    showToast('Sincronização concluída com sucesso!');
-  }
-}
-
 // 7. Rendering Logic
 function renderListaCtrcs(data) {
   const listaCtrcsEl = document.getElementById('listaCtrcs');
@@ -285,7 +132,7 @@ function renderListaCtrcs(data) {
     btn.style.padding = '15px';
     btn.innerHTML = `<strong>${ctrcId}</strong>${conferente}`;
     btn.onclick = () => selecionarCtrc(ctrcId);
-    
+
     li.appendChild(btn);
     listaCtrcsEl.appendChild(li);
   });
@@ -376,7 +223,7 @@ async function selecionarCtrc(ctrcId) {
   if (data) {
     state.ctrcObj = normalizeCtrcData(data);
     if (state.ctrcObj) {
-      state.ctrcObj.ctrc = ctrcId; // Ensure correct ID
+      state.ctrcObj.ctrc = ctrcId;
       document.getElementById('telaCtrcList').style.display = 'none';
       document.getElementById('telaSeparacao').style.display = 'block';
       sessionStorage.setItem(CONFIG.STORAGE_KEYS.WAS_SEPARACAO, '1');
@@ -444,7 +291,6 @@ function setupScanning() {
     }
   });
 
-  // Keep focus
   input.addEventListener('blur', () => {
     if (document.getElementById('telaSeparacao').style.display !== 'none') {
       ensureBipInputFocus(50);
@@ -466,18 +312,15 @@ function processBip(ean) {
     return;
   }
 
-  // Update item
   item.qtd_bipada++;
   item.qtd_restante = Math.max(0, item.quantidade - item.qtd_bipada);
   item.status = (item.qtd_bipada === item.quantidade) ? 'Finalizado' : 'Parcial';
 
-  // Update totals
   state.ctrcObj.totais = calculateTotals(state.ctrcObj.itens);
 
   showToast(`Bipado: ${item.produto}`, 'success');
   saveProgress();
 
-  // Re-render or update UI
   updateItemRowUI(item);
   updateTotalsUI();
   checkFinalizar();
@@ -507,10 +350,23 @@ function checkFinalizar() {
 function saveLog(tipo, payload) {
   try {
     const logs = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.LOGS) || '[]');
-    logs.push({ timestamp: new Date().toISOString(), tipo, payload });
-    localStorage.setItem(CONFIG.STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(-100))); // Keep last 100
+
+    // Clean up logs older than 7 days
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const filteredLogs = logs.filter(log => new Date(log.timestamp) > oneWeekAgo);
+
+    filteredLogs.push({ timestamp: new Date().toISOString(), tipo, payload });
+
+    // Prune to last 50 entries to keep localStorage footprint small
+    localStorage.setItem(CONFIG.STORAGE_KEYS.LOGS, JSON.stringify(filteredLogs.slice(-50)));
   } catch (e) {
     console.error('Log error:', e);
+    // If quota exceeded, clear logs and try once more
+    if (e.name === 'QuotaExceededError') {
+      localStorage.removeItem(CONFIG.STORAGE_KEYS.LOGS);
+    }
   }
 }
 
@@ -518,12 +374,10 @@ function saveLog(tipo, payload) {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[LOG] Picking App Initialized');
 
-  // Connection Status
   window.addEventListener('online', updateConnectionStatus);
   window.addEventListener('offline', updateConnectionStatus);
   updateConnectionStatus();
 
-  // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
@@ -532,18 +386,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Offline/Online Handlers
   window.addEventListener('online', processOfflineQueue);
   if (navigator.onLine) processOfflineQueue();
 
-  // Setup alert sound
   const alertAudio = document.createElement('audio');
   alertAudio.id = 'alertSound';
   alertAudio.src = CONFIG.SOUNDS.ALERT;
   alertAudio.preload = 'auto';
   document.body.appendChild(alertAudio);
 
-  // Load progress
   if (loadProgress()) {
     document.getElementById('telaCtrcList').style.display = 'none';
     document.getElementById('telaSeparacao').style.display = 'block';
@@ -553,7 +404,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderListaCtrcs(ctrcs);
   }
 
-  // Back button
   document.getElementById('btnVoltar').onclick = async () => {
     if (state.ctrcObj && state.ctrcObj.totais.qtd_bipada_total > 0) {
       if (!confirm('Há progresso não finalizado. Deseja realmente voltar?')) return;
@@ -567,7 +417,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderListaCtrcs(ctrcs);
   };
 
-  // Global focus click handler
   document.addEventListener('click', (e) => {
     if (document.getElementById('telaSeparacao').style.display !== 'none') {
       if (!['INPUT', 'BUTTON', 'SELECT', 'A'].includes(e.target.tagName)) {
