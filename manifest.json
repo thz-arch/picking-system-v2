@@ -1,0 +1,16 @@
+{
+  "name": "Binho Picking",
+  "short_name": "Binho",
+  "description": "Interface de Separação de Pedidos - Binho Transportes",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#e3f6f2",
+  "theme_color": "#1976d2",
+  "icons": [
+    {
+      "src": "binho-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

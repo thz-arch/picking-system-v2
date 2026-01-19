@@ -10,7 +10,8 @@ const CONFIG = {
   STORAGE_KEYS: {
     PROGRESS: 'picking_progress',
     WAS_SEPARACAO: 'picking_was_separacao',
-    LOGS: 'picking_logs'
+    LOGS: 'picking_logs',
+    OFFLINE_QUEUE: 'picking_offline_queue'
   },
   SOUNDS: {
     ALERT: 'mixkit-short-electric-fence-buzz-2966.wav'
@@ -24,6 +25,20 @@ let state = {
 };
 
 // 3. UI Utilities
+function updateConnectionStatus() {
+  const statusEl = document.getElementById('statusConexao');
+  if (!statusEl) return;
+
+  if (navigator.onLine) {
+    statusEl.style.background = '#4caf50'; // Green
+    statusEl.title = 'Online';
+  } else {
+    statusEl.style.background = '#f44336'; // Red
+    statusEl.title = 'Offline';
+    showToast('Você está offline. O progresso será salvo localmente.', 'error');
+  }
+}
+
 function showLoading() {
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.style.display = 'flex';
@@ -41,7 +56,12 @@ function showToast(message, type = 'success') {
   toast.style.top = '20px';
   toast.style.left = '50%';
   toast.style.transform = 'translateX(-50%)';
-  toast.style.background = type === 'success' ? '#388e3c' : '#d32f2f';
+
+  let bg = '#388e3c'; // success green
+  if (type === 'error') bg = '#d32f2f'; // error red
+  if (type === 'warning') bg = '#f57c00'; // warning orange
+
+  toast.style.background = bg;
   toast.style.color = '#fff';
   toast.style.padding = '10px 24px';
   toast.style.borderRadius = '8px';
@@ -50,7 +70,7 @@ function showToast(message, type = 'success') {
   toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
   document.body.appendChild(toast);
 
-  if (type === 'error') {
+  if (type === 'error' || type === 'warning') {
     tocarAlerta();
   }
 
@@ -169,6 +189,13 @@ function calculateTotals(itens) {
 
 // 6. API Calls
 async function apiCall(acao, params = {}) {
+  // If offline and it's not a background sync call, we might want to queue or warn
+  if (!navigator.onLine && acao === 'dar_baixa') {
+    queueOfflineAction(acao, params);
+    showToast('Offline: Ação salva para sincronização posterior.', 'success');
+    return { status: 'queued' };
+  }
+
   showLoading();
   try {
     const response = await fetch(CONFIG.API_URL, {
@@ -180,10 +207,59 @@ async function apiCall(acao, params = {}) {
     return await response.json();
   } catch (error) {
     console.error(`[API ERROR] ${acao}:`, error);
+
+    if (acao === 'dar_baixa' && (!navigator.onLine || error.message.includes('Failed to fetch'))) {
+      queueOfflineAction(acao, params);
+      showToast('Erro de conexão: Ação salva para sincronização.', 'success');
+      return { status: 'queued' };
+    }
+
     showToast(`Erro na comunicação com o servidor: ${error.message}`, 'error');
     return null;
   } finally {
     hideLoading();
+  }
+}
+
+function queueOfflineAction(acao, params) {
+  try {
+    const queue = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE) || '[]');
+    queue.push({ acao, params, timestamp: new Date().toISOString() });
+    localStorage.setItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
+    console.log('[OFFLINE] Action queued:', acao);
+  } catch (e) {
+    console.error('[OFFLINE] Failed to queue action:', e);
+  }
+}
+
+async function processOfflineQueue() {
+  if (!navigator.onLine) return;
+
+  const queue = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE) || '[]');
+  if (queue.length === 0) return;
+
+  console.log(`[SYNC] Processing ${queue.length} offline actions...`);
+  showToast('Sincronizando dados pendentes...');
+
+  const remainingQueue = [];
+  for (const item of queue) {
+    try {
+      const result = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: item.acao, ...item.params })
+      });
+      if (!result.ok) throw new Error('Sync failed');
+      console.log('[SYNC] Action synced successfully:', item.acao);
+    } catch (e) {
+      console.error('[SYNC] Failed to sync item, keeping in queue:', e);
+      remainingQueue.push(item);
+    }
+  }
+
+  localStorage.setItem(CONFIG.STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(remainingQueue));
+  if (remainingQueue.length === 0) {
+    showToast('Sincronização concluída com sucesso!');
   }
 }
 
@@ -202,7 +278,7 @@ function renderListaCtrcs(data) {
     const li = document.createElement('li');
     li.className = 'ctrc-item';
     const conferente = row.conferente ? `<div style="font-size:0.85em; opacity:0.9;">Conferente: ${row.conferente}</div>` : '';
-    
+
     const btn = document.createElement('button');
     btn.style.width = '100%';
     btn.style.marginBottom = '10px';
@@ -381,12 +457,12 @@ function processBip(ean) {
 
   const item = state.ctrcObj.itens.find(i => i.ean === ean || i.codigo === ean);
   if (!item) {
-    showToast(`EAN/Código ${ean} não encontrado!`, 'error');
+    showToast(`ITEM NÃO PERTENCE A ESTA CARGA: ${ean}`, 'error');
     return;
   }
 
   if (item.qtd_bipada >= item.quantidade) {
-    showToast('Quantidade máxima já atingida para este item!', 'error');
+    showToast(`ALERTA: Quantidade excedida para ${item.produto}`, 'warning');
     return;
   }
 
@@ -441,6 +517,24 @@ function saveLog(tipo, payload) {
 // 10. Initialization
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[LOG] Picking App Initialized');
+
+  // Connection Status
+  window.addEventListener('online', updateConnectionStatus);
+  window.addEventListener('offline', updateConnectionStatus);
+  updateConnectionStatus();
+
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('[PWA] Service Worker registered'))
+        .catch(err => console.warn('[PWA] Service Worker registration failed', err));
+    });
+  }
+
+  // Offline/Online Handlers
+  window.addEventListener('online', processOfflineQueue);
+  if (navigator.onLine) processOfflineQueue();
 
   // Setup alert sound
   const alertAudio = document.createElement('audio');

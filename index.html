@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Picking Interface</title>
   <link rel="icon" type="image/x-icon" href="binho.ico">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
@@ -16,8 +17,9 @@
   </div>
 
   <div class="container">
-    <div id="logo-topo" style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+    <div id="logo-topo" style="display:flex;align-items:center;justify-content:center;margin-bottom:10px; position:relative;">
       <img src="binho-logo.png" alt="Binho Transportes" style="height:56px;margin-right:12px;">
+      <div id="statusConexao" title="Status de Conexão" style="width:12px; height:12px; border-radius:50%; background:#4caf50; position:absolute; right:10px; top:10px; border:2px solid #fff; box-shadow:0 0 5px rgba(0,0,0,0.2);"></div>
     </div>
     <h1>Separação de Pedidos</h1>
 
